@@ -109,8 +109,10 @@ def main():
 
             cv2.imshow("Face and Eye Detection", frame)
 
-            # Exit when ESC is pressed
+            # Exit when ESC is pressed or window is closed
             if cv2.waitKey(1) & 0xFF == EXIT_KEY:
+                break
+            if cv2.getWindowProperty("Face and Eye Detection", cv2.WND_PROP_VISIBLE) < 1:
                 break
 
     finally:
