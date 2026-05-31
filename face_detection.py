@@ -1,32 +1,122 @@
 import cv2
 
-face_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_frontalface_default.xml')
-eye_cascade = cv2.CascadeClassifier(cv2.data.haarcascades + 'haarcascade_eye.xml')
 
-capture_frames = cv2.VideoCapture(0,cv2.CAP_DSHOW)
+# ----------------------------
+# Configuration
+# ----------------------------
+FACE_SCALE_FACTOR = 1.3
+FACE_MIN_NEIGHBORS = 5
+EXIT_KEY = 27  # ESC key
 
-while (1):
-    ret, img = capture_frames.read()
-    gray_scale = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    faces = face_cascade.detectMultiScale(gray_scale, 1.3, 5)
+
+def load_cascades():
+    """
+    Load Haar Cascade classifiers for face and eye detection.
+
+    Returns:
+        tuple: (face_cascade, eye_cascade)
+    """
+    face_cascade = cv2.CascadeClassifier(
+        cv2.data.haarcascades + "haarcascade_frontalface_default.xml"
+    )
+
+    eye_cascade = cv2.CascadeClassifier(
+        cv2.data.haarcascades + "haarcascade_eye.xml"
+    )
+
+    if face_cascade.empty():
+        raise RuntimeError("Failed to load face cascade.")
+
+    if eye_cascade.empty():
+        raise RuntimeError("Failed to load eye cascade.")
+
+    return face_cascade, eye_cascade
+
+
+def detect_and_draw_faces(frame, face_cascade, eye_cascade):
+    """
+    Detect faces and eyes in a frame and draw rectangles around them.
+
+    Args:
+        frame: Input BGR image frame.
+        face_cascade: Face detector.
+        eye_cascade: Eye detector.
+
+    Returns:
+        frame: Annotated frame.
+    """
+    gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+
+    faces = face_cascade.detectMultiScale(
+        gray,
+        scaleFactor=FACE_SCALE_FACTOR,
+        minNeighbors=FACE_MIN_NEIGHBORS
+    )
 
     for (x, y, w, h) in faces:
-        # To draw a rectangle in a face
-        cv2.rectangle(img, (x, y), (x + w, y + h), (255, 255, 0), 2)
-        roi_gray = gray_scale[y:y + h, x:x + w]
-        roi_color = img[y:y + h, x:x + w]
+        # Draw rectangle around face
+        cv2.rectangle(
+            frame,
+            (x, y),
+            (x + w, y + h),
+            (255, 255, 0),
+            2
+        )
 
-        eyes = eye_cascade.detectMultiScale(roi_gray)
+        # Region of interest (face area)
+        face_gray = gray[y:y + h, x:x + w]
+        face_color = frame[y:y + h, x:x + w]
+
+        # Detect eyes inside the detected face
+        eyes = eye_cascade.detectMultiScale(face_gray)
 
         for (ex, ey, ew, eh) in eyes:
-            cv2.rectangle(roi_color, (ex, ey), (ex + ew, ey + eh), (0, 127, 255), 2)
+            cv2.rectangle(
+                face_color,
+                (ex, ey),
+                (ex + ew, ey + eh),
+                (0, 127, 255),
+                2
+            )
 
-    cv2.imshow('img', img)
+    return frame
 
-    n = cv2.waitKey(30) & 0xff
-    if n == 27:
-        break
 
-capture_frames.release()
-cv2.destroyAllWindows()
+def main():
+    """
+    Main application loop.
+    """
+    face_cascade, eye_cascade = load_cascades()
 
+    camera = cv2.VideoCapture(0, cv2.CAP_DSHOW)
+
+    if not camera.isOpened():
+        raise RuntimeError("Could not open webcam.")
+
+    try:
+        while True:
+            success, frame = camera.read()
+
+            if not success:
+                print("Failed to capture frame.")
+                break
+
+            frame = detect_and_draw_faces(
+                frame,
+                face_cascade,
+                eye_cascade
+            )
+
+            cv2.imshow("Face and Eye Detection", frame)
+
+            # Exit when ESC is pressed
+            if cv2.waitKey(1) & 0xFF == EXIT_KEY:
+                break
+
+    finally:
+        camera.release()
+        cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    main()
